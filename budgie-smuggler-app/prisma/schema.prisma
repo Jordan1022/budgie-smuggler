@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id          String   @id @db.Uuid
+  displayName String?  @map("display_name")
+  timezone    String   @default("America/Chicago")
+  currency    String   @default("USD") @map("currency_code")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  plaidItems       PlaidItem[]
+  bankAccounts     BankAccount[]
+  categories       Category[]
+  transactions     Transaction[]
+  monthlyBudgets   MonthlyBudget[]
+  alerts           Alert[]
+  alertEvents      AlertEvent[]
+  insightSnapshots InsightSnapshot[]
+
+  @@map("profiles")
+}
+
+model PlaidItem {
+  id                   String    @id @default(uuid()) @db.Uuid
+  ownerUserId          String    @map("owner_user_id") @db.Uuid
+  plaidItemId          String    @unique @map("plaid_item_id")
+  accessTokenEncrypted String    @map("access_token_encrypted")
+  institutionName      String?   @map("institution_name")
+  lastCursor           String?   @map("last_cursor")
+  lastSyncAt           DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  syncStatus           String    @default("healthy") @map("sync_status")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner    Profile       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  accounts BankAccount[]
+
+  @@index([ownerUserId])
+  @@map("plaid_items")
+}
+
+model BankAccount {
+  id               String    @id @default(uuid()) @db.Uuid
+  ownerUserId      String    @map("owner_user_id") @db.Uuid
+  plaidItemRefId   String    @map("plaid_item_ref_id") @db.Uuid
+  plaidAccountId   String    @unique @map("plaid_account_id")
+  name             String
+  mask             String?
+  type             String?
+  subtype          String?
+  currentBalance   Decimal?  @db.Decimal(14, 2)
+  availableBalance Decimal?  @db.Decimal(14, 2)
+  lastBalanceAt    DateTime? @map("last_balance_at") @db.Timestamptz(6)
+
+  owner        Profile       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  plaidItem    PlaidItem     @relation(fields: [plaidItemRefId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([ownerUserId])
+  @@map("bank_accounts")
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  name        String
+  color       String?
+  icon        String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner          Profile         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  monthlyBudgets MonthlyBudget[]
+
+  @@unique([ownerUserId, name])
+  @@index([ownerUserId])
+  @@map("categories")
+}
+
+model Transaction {
+  id                 String   @id @default(uuid()) @db.Uuid
+  ownerUserId        String   @map("owner_user_id") @db.Uuid
+  bankAccountId      String   @map("bank_account_id") @db.Uuid
+  plaidTransactionId String?  @unique @map("plaid_transaction_id")
+  postedDate         DateTime @map("posted_date") @db.Date
+  merchantName       String?  @map("merchant_name")
+  description        String?
+  amount             Decimal  @db.Decimal(14, 2)
+  direction          String
+  pending            Boolean  @default(false)
+  categoryId         String?  @map("category_id") @db.Uuid
+  userOverrideCategory Boolean @default(false) @map("user_override_category")
+  rawCategory        String[] @default([]) @map("raw_category")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner       Profile     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, postedDate])
+  @@map("transactions")
+}
+
+model MonthlyBudget {
+  id              String   @id @default(uuid()) @db.Uuid
+  ownerUserId     String   @map("owner_user_id") @db.Uuid
+  monthStart      DateTime @map("month_start") @db.Date
+  categoryId      String   @map("category_id") @db.Uuid
+  amountLimit     Decimal  @map("amount_limit") @db.Decimal(14, 2)
+  rolloverEnabled Boolean  @default(false) @map("rollover_enabled")
+
+  owner    Profile  @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerUserId, monthStart, categoryId])
+  @@index([ownerUserId])
+  @@map("monthly_budgets")
+}
+
+model Alert {
+  id          String   @id @default(uuid()) @db.Uuid
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  type        String
+  channel     String   @default("email")
+  enabled     Boolean  @default(true)
+  config      Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner  Profile      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  events AlertEvent[]
+
+  @@unique([ownerUserId, type])
+  @@index([ownerUserId])
+  @@map("alerts")
+}
+
+model AlertEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  ownerUserId String    @map("owner_user_id") @db.Uuid
+  alertId     String    @map("alert_id") @db.Uuid
+  status      String
+  dedupeKey   String    @map("dedupe_key")
+  payload     Json
+  sentAt      DateTime? @map("sent_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner Profile @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  alert Alert   @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerUserId, dedupeKey])
+  @@index([ownerUserId])
+  @@map("alert_events")
+}
+
+model InsightSnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  windowStart DateTime @map("window_start") @db.Date
+  windowEnd   DateTime @map("window_end") @db.Date
+  insightType String   @map("insight_type")
+  summary     String
+  details     Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner Profile @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId])
+  @@map("insight_snapshots")
+}
