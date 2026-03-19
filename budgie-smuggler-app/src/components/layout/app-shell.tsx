@@ -16,7 +16,7 @@ export function AppShell({
         <aside className="hidden rounded-2xl border border-[var(--line)] bg-white p-4 md:block">
           <h1 className="mb-4 inline-flex items-center gap-2 text-xl font-bold tracking-tight">
             <span className="relative inline-flex h-5 w-5 shrink-0 overflow-hidden rounded-sm">
-              <Image src="/budgie-mark.png" alt="Budgie logo mark" fill className="object-contain" sizes="20px" />
+              <Image src="/bird.png" alt="Budgie logo mark" fill className="object-contain" sizes="20px" />
             </span>
             <span>{APP_NAME}</span>
           </h1>
