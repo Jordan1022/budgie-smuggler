@@ -20,7 +20,12 @@ export const metadata: Metadata = {
   description: "Private budgeting app with bank sync, alerts, and personalized insights.",
   applicationName: APP_NAME,
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: [{ url: "/icon-192.png", type: "image/png", sizes: "192x192" }],
+    apple: [{ url: "/icon-192.png", type: "image/png", sizes: "192x192" }],
   },
   appleWebApp: {
     capable: true,
@@ -33,8 +38,22 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased`}>
-        <PwaRegister />
-        {children}
+        <div className="bg-[var(--paper)]">
+          <PwaRegister />
+          {children}
+          <footer className="px-4 pb-6 text-center text-xs text-neutral-500 md:px-6">
+            Budgie icons created by{" "}
+            <a
+              href="https://www.flaticon.com/free-icons/budgie"
+              title="budgie icons"
+              className="underline hover:text-neutral-700"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Park Jisun - Flaticon
+            </a>
+          </footer>
+        </div>
       </body>
     </html>
   );

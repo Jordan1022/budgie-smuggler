@@ -1,4 +1,5 @@
 import { AlertPreferencesForm } from "@/components/forms/alert-preferences-form";
+import { PlaidLinkManager } from "@/components/forms/plaid-link-manager";
 import { requireUser } from "@/lib/auth";
 import { isDatabaseConfigured, isEmailConfigured, isPlaidConfigured, isSupabaseConfigured } from "@/lib/env";
 import { getAlertPreferences } from "@/lib/server-data";
@@ -6,12 +7,16 @@ import { getAlertPreferences } from "@/lib/server-data";
 export default async function SettingsPage() {
   const user = await requireUser();
   const { alerts, source } = await getAlertPreferences(user.id);
+  const supabaseReady = isSupabaseConfigured();
+  const databaseReady = isDatabaseConfigured();
+  const plaidReady = isPlaidConfigured();
+  const emailReady = isEmailConfigured();
 
   const checks = [
-    { name: "Supabase", ok: isSupabaseConfigured() },
-    { name: "Postgres", ok: isDatabaseConfigured() },
-    { name: "Plaid", ok: isPlaidConfigured() },
-    { name: "Resend", ok: isEmailConfigured() },
+    { name: "Supabase", ok: supabaseReady },
+    { name: "Postgres", ok: databaseReady },
+    { name: "Plaid", ok: plaidReady },
+    { name: "Resend", ok: emailReady },
   ];
 
   return (
@@ -32,6 +37,8 @@ export default async function SettingsPage() {
           ))}
         </ul>
       </section>
+
+      <PlaidLinkManager canUsePlaid={plaidReady} canUseDatabase={databaseReady} />
 
       <AlertPreferencesForm initialPreferences={alerts} source={source} />
 

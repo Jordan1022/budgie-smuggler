@@ -21,7 +21,7 @@ export default async function HomePage() {
       <section className="w-full rounded-3xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-10">
         <div className="flex items-center gap-3">
           <span className="relative inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-sm">
-            <Image src="/budgie-mark.png" alt="Budgie logo mark" fill className="object-cover object-top" sizes="32px" />
+            <Image src="/budgie-mark.png" alt="Budgie logo mark" fill className="object-contain" sizes="32px" />
           </span>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{APP_NAME}</h1>
         </div>
