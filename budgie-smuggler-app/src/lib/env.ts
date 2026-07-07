@@ -15,6 +15,8 @@ const envSchema = z.object({
   PLAID_WEBHOOK_SECRET: optional,
   RESEND_API_KEY: optional,
   ALERT_FROM_EMAIL: optional,
+  XAI_API_KEY: optional,
+  XAI_MODEL: z.string().trim().optional().default("grok-4.3"),
   DATA_ENCRYPTION_KEY: optional,
 });
 
@@ -38,6 +40,8 @@ export function env() {
     PLAID_WEBHOOK_SECRET: process.env.PLAID_WEBHOOK_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     ALERT_FROM_EMAIL: process.env.ALERT_FROM_EMAIL,
+    XAI_API_KEY: process.env.XAI_API_KEY,
+    XAI_MODEL: process.env.XAI_MODEL,
     DATA_ENCRYPTION_KEY: process.env.DATA_ENCRYPTION_KEY,
   });
 
@@ -61,4 +65,8 @@ export function isPlaidConfigured() {
 export function isEmailConfigured() {
   const parsed = env();
   return Boolean(parsed.RESEND_API_KEY && parsed.ALERT_FROM_EMAIL);
+}
+
+export function isXaiConfigured() {
+  return Boolean(env().XAI_API_KEY);
 }

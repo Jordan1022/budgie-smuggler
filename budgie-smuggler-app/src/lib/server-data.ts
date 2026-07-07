@@ -123,6 +123,101 @@ export async function getTransactions(userId: string) {
   };
 }
 
+export async function getImportedTransactionsForReview(userId: string) {
+  if (!prisma) {
+    return {
+      transactions: [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          parsedDate: "2026-06-01",
+          rawDescription: "Amazon Marketplace",
+          amount: 42.18,
+          direction: "debit",
+          detectedCategory: null,
+          detectedUsageType: "unknown",
+          detectedCashFlowRole: "spending",
+          reviewStatus: "needs_review",
+          duplicateTransactionId: null,
+          confidence: 0.55,
+          accountName: "Sample Checking",
+        },
+      ],
+      source: "mock" as const,
+    };
+  }
+  const db = prisma;
+
+  const rows = await db.importedTransaction.findMany({
+    where: {
+      ownerUserId: userId,
+      reviewStatus: {
+        in: ["needs_review", "suggested"],
+      },
+    },
+    include: {
+      bankAccount: true,
+    },
+    orderBy: [{ parsedDate: "desc" }, { createdAt: "desc" }],
+    take: 200,
+  });
+
+  return {
+    transactions: rows.map((row) => ({
+      id: row.id,
+      parsedDate: row.parsedDate.toISOString().slice(0, 10),
+      rawDescription: row.rawDescription,
+      amount: toNumber(row.amount),
+      direction: row.direction,
+      detectedCategory: row.detectedCategory,
+      detectedUsageType: row.detectedUsageType,
+      detectedCashFlowRole: row.detectedCashFlowRole,
+      reviewStatus: row.reviewStatus,
+      duplicateTransactionId: row.duplicateTransactionId,
+      confidence: toNumber(row.confidence),
+      accountName: row.bankAccount.name,
+    })),
+    source: "database" as const,
+  };
+}
+
+export async function getAccounts(userId: string) {
+  if (!prisma) {
+    return {
+      accounts: [
+        {
+          id: "mock-account",
+          name: "Sample Checking",
+          type: "checking",
+          usageType: "personal",
+          sourceType: "manual",
+          lastImportedAt: null,
+        },
+      ],
+      source: "mock" as const,
+    };
+  }
+  const db = prisma;
+
+  const rows = await db.bankAccount.findMany({
+    where: {
+      ownerUserId: userId,
+    },
+    orderBy: [{ sourceType: "asc" }, { name: "asc" }],
+  });
+
+  return {
+    accounts: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      usageType: row.usageType,
+      sourceType: row.sourceType,
+      lastImportedAt: row.lastImportedAt?.toISOString() ?? null,
+    })),
+    source: "database" as const,
+  };
+}
+
 export async function getBudgets(userId: string) {
   if (!prisma) {
     return {

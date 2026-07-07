@@ -22,6 +22,11 @@ model Profile {
   alerts           Alert[]
   alertEvents      AlertEvent[]
   insightSnapshots InsightSnapshot[]
+  importBatches        ImportBatch[]
+  importedTransactions ImportedTransaction[]
+  actionItems          ActionItem[]
+  aiRuns               AiRun[]
+  aiFindings           AiFinding[]
 
   @@map("profiles")
 }
@@ -47,19 +52,25 @@ model PlaidItem {
 model BankAccount {
   id               String    @id @default(uuid()) @db.Uuid
   ownerUserId      String    @map("owner_user_id") @db.Uuid
-  plaidItemRefId   String    @map("plaid_item_ref_id") @db.Uuid
-  plaidAccountId   String    @unique @map("plaid_account_id")
+  plaidItemRefId   String?   @map("plaid_item_ref_id") @db.Uuid
+  plaidAccountId   String?   @unique @map("plaid_account_id")
   name             String
   mask             String?
   type             String?
   subtype          String?
+  sourceType       String    @default("plaid") @map("source_type")
+  usageType        String    @default("unknown") @map("usage_type")
   currentBalance   Decimal?  @db.Decimal(14, 2)
   availableBalance Decimal?  @db.Decimal(14, 2)
   lastBalanceAt    DateTime? @map("last_balance_at") @db.Timestamptz(6)
+  lastImportedAt   DateTime? @map("last_imported_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   owner        Profile       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  plaidItem    PlaidItem     @relation(fields: [plaidItemRefId], references: [id], onDelete: Cascade)
+  plaidItem    PlaidItem?    @relation(fields: [plaidItemRefId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  importBatches ImportBatch[]
+  importedTransactions ImportedTransaction[]
 
   @@index([ownerUserId])
   @@map("bank_accounts")
@@ -97,6 +108,13 @@ model Transaction {
   categoryId         String?  @map("category_id") @db.Uuid
   userOverrideCategory Boolean @default(false) @map("user_override_category")
   rawCategory        String[] @default([]) @map("raw_category")
+  sourceType            String   @default("plaid") @map("source_type")
+  sourceImportBatchId   String?  @map("source_import_batch_id") @db.Uuid
+  usageType             String   @default("unknown") @map("usage_type")
+  cashFlowRole          String   @default("spending") @map("cash_flow_role")
+  reviewStatus          String   @default("accepted") @map("review_status")
+  confidence            Decimal? @db.Decimal(5, 4)
+  notes                 String?
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -173,4 +191,117 @@ model InsightSnapshot {
 
   @@index([ownerUserId])
   @@map("insight_snapshots")
+}
+
+model ImportBatch {
+  id                 String    @id @default(uuid()) @db.Uuid
+  ownerUserId        String    @map("owner_user_id") @db.Uuid
+  bankAccountId      String    @map("bank_account_id") @db.Uuid
+  fileName           String    @map("file_name")
+  fileType           String    @map("file_type")
+  fileHash           String    @map("file_hash")
+  parserStatus       String    @default("parsed") @map("parser_status")
+  detectedStartDate  DateTime? @map("detected_start_date") @db.Date
+  detectedEndDate    DateTime? @map("detected_end_date") @db.Date
+  rawFileStoragePath String?   @map("raw_file_storage_path")
+  extractedTextPath  String?   @map("extracted_text_path")
+  redactionSummary   Json?     @map("redaction_summary")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner        Profile               @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  bankAccount  BankAccount           @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  transactions ImportedTransaction[]
+
+  @@index([ownerUserId, createdAt])
+  @@map("import_batches")
+}
+
+model ImportedTransaction {
+  id                    String    @id @default(uuid()) @db.Uuid
+  importBatchId         String    @map("import_batch_id") @db.Uuid
+  ownerUserId           String    @map("owner_user_id") @db.Uuid
+  bankAccountId         String    @map("bank_account_id") @db.Uuid
+  rawDate               String?   @map("raw_date")
+  parsedDate            DateTime  @map("parsed_date") @db.Date
+  rawDescription        String    @map("raw_description")
+  normalizedDescription String    @map("normalized_description")
+  amount                Decimal   @db.Decimal(14, 2)
+  direction             String
+  detectedCategory      String?   @map("detected_category")
+  detectedUsageType     String    @default("unknown") @map("detected_usage_type")
+  detectedCashFlowRole  String    @default("spending") @map("detected_cash_flow_role")
+  duplicateTransactionId String?  @map("duplicate_transaction_id") @db.Uuid
+  confidence            Decimal?  @db.Decimal(5, 4)
+  reviewStatus          String    @default("needs_review") @map("review_status")
+  sourceRow             Json      @map("source_row")
+  acceptedTransactionId String?   @map("accepted_transaction_id") @db.Uuid
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  importBatch ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  owner       Profile     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, reviewStatus])
+  @@index([ownerUserId, parsedDate])
+  @@map("imported_transactions")
+}
+
+model ActionItem {
+  id                String    @id @default(uuid()) @db.Uuid
+  ownerUserId       String    @map("owner_user_id") @db.Uuid
+  type              String
+  title             String
+  body              String?
+  priority          String    @default("normal")
+  dueDate           DateTime? @map("due_date") @db.Date
+  status            String    @default("open")
+  relatedEntityType String?   @map("related_entity_type")
+  relatedEntityId   String?   @map("related_entity_id") @db.Uuid
+  source            String    @default("system")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner Profile @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, status, priority])
+  @@map("action_items")
+}
+
+model AiRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  ownerUserId    String   @map("owner_user_id") @db.Uuid
+  provider       String   @default("xai")
+  model          String
+  purpose        String
+  redactionLevel String   @map("redaction_level")
+  promptVersion  String   @map("prompt_version")
+  inputSummary   Json     @map("input_summary")
+  outputStatus   String   @map("output_status")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner    Profile     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  findings AiFinding[]
+
+  @@index([ownerUserId, createdAt])
+  @@map("ai_runs")
+}
+
+model AiFinding {
+  id                String   @id @default(uuid()) @db.Uuid
+  aiRunId           String   @map("ai_run_id") @db.Uuid
+  ownerUserId       String   @map("owner_user_id") @db.Uuid
+  findingType       String   @map("finding_type")
+  structuredOutput  Json     @map("structured_output")
+  confidence        Decimal? @db.Decimal(5, 4)
+  relatedEntityType String?  @map("related_entity_type")
+  relatedEntityId   String?  @map("related_entity_id") @db.Uuid
+  reviewStatus      String   @default("suggested") @map("review_status")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  aiRun AiRun   @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  owner Profile @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, reviewStatus])
+  @@map("ai_findings")
 }

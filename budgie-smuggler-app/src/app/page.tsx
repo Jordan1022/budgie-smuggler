@@ -10,7 +10,7 @@ export default async function HomePage() {
     const { data } = await supabase.auth.getUser();
 
     if (data.user) {
-      redirect("/dashboard");
+      redirect("/today");
     }
   } catch {
     // Continue rendering public page when env is not configured.
@@ -29,7 +29,7 @@ export default async function HomePage() {
           Private + Mobile-First
         </p>
         <p className="mt-4 max-w-2xl text-base text-neutral-700 sm:text-lg">
-          Personal budgeting with secure bank sync, category budgets, and low-noise alerts. Every account is isolated by user profile.
+          Blunt money control with manual imports, category budgets, and low-noise alerts. Every account is isolated by user profile.
         </p>
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">

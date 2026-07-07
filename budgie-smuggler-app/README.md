@@ -4,6 +4,10 @@ Private, mobile-first budgeting app for two independent users. Each login has fu
 
 ## Current Product Features
 
+- Use Today as the default action inbox for concrete money tasks.
+- Create manual personal, business, mixed, or unknown accounts without Plaid.
+- Upload CSV statements, stage imported rows, and review them before ledger acceptance.
+- Use Grok-backed classification suggestions for imported transactions when xAI credentials are configured.
 - Create custom budget categories and assign monthly limits in the Budgets screen.
 - Auto-map Plaid transactions into your custom categories using rule-based matching.
 - Manually override transaction categories and lock them so future syncs do not overwrite your choice.
@@ -17,6 +21,7 @@ Private, mobile-first budgeting app for two independent users. Each login has fu
 - Supabase Auth + Postgres (free tier)
 - Prisma ORM
 - Plaid Transactions API
+- xAI/Grok for optional import classification
 - Resend email alerts
 - PWA support (installable on iOS/Android home screen)
 
@@ -60,6 +65,7 @@ npm run dev
 
 - File: `supabase/migrations/0001_initial.sql`
 - File: `supabase/migrations/0002_alert_prefs_and_category_lock.sql`
+- File: `supabase/migrations/0004_manual_imports_ai_actions.sql`
 
 4. Set values in `.env.local`:
 
@@ -89,6 +95,25 @@ npm run dev
 - `RESEND_API_KEY`
 - `ALERT_FROM_EMAIL`
 
+## Manual Imports
+
+CSV imports are available at `/import`. Create a manual account, upload a CSV, then review staged transactions at `/review` before they become accepted ledger transactions.
+
+Supported CSV columns:
+
+- `Date`, `Posted Date`, `Post Date`, or `Transaction Date`
+- `Description`, `Merchant`, `Name`, `Payee`, or `Memo`
+- signed `Amount`, or split `Debit`/`Credit`
+
+## Grok Classification
+
+Set these env vars to enable AI suggestions:
+
+- `XAI_API_KEY`
+- `XAI_MODEL` defaults to `grok-4.3`
+
+Without `XAI_API_KEY`, the app returns deterministic fallback suggestions so imports remain usable.
+
 ## Cron Jobs (Vercel)
 
 `vercel.json` schedules:
@@ -108,8 +133,9 @@ npm run build
 
 ## Current Behavior Without Credentials
 
-If Supabase/Postgres/Plaid/Resend are not configured yet, the app still runs in sample mode:
+If Supabase/Postgres/Plaid/Resend/xAI are not configured yet, the app still runs in sample mode:
 
 - UI uses mock budget/transaction/insight data.
 - API endpoints return mock or graceful "not configured" responses.
+- Grok classification falls back to reviewable local suggestions.
 - This keeps local development moving while integrations are being configured.

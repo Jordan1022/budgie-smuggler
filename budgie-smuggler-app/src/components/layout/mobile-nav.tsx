@@ -10,14 +10,14 @@ export function MobileNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-white/95 backdrop-blur md:hidden">
-      <ul className="grid grid-cols-5">
+      <ul className="flex overflow-x-auto px-2">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           return (
-            <li key={item.href}>
+            <li key={item.href} className="shrink-0">
               <Link
                 className={clsx(
-                  "flex h-14 items-center justify-center text-xs font-medium",
+                  "flex h-14 min-w-20 items-center justify-center px-3 text-xs font-medium",
                   isActive ? "text-[var(--ink)]" : "text-neutral-500",
                 )}
                 href={item.href}
