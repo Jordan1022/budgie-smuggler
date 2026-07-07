@@ -6,9 +6,11 @@ Private, mobile-first budgeting app for two independent users. Each login has fu
 
 - Use Today as the default action inbox for concrete money tasks.
 - Create manual personal, business, mixed, or unknown accounts without Plaid.
-- Upload CSV statements, stage imported rows, and review them before ledger acceptance.
+- Upload CSV or text-based PDF statements, stage imported rows, and review them before ledger acceptance.
 - Track debt accounts with APR, minimum payment, due dates, credit limits, and personal/business usage.
 - Scan accepted transactions for subscriptions and recurring charges.
+- Review household, personal/business, debt-pressure, and subscription cut-list reports.
+- Generate a Grok-backed money brief and ask money questions in Coach when xAI credentials are configured.
 - Use Grok-backed classification suggestions for imported transactions when xAI credentials are configured.
 - Create custom budget categories and assign monthly limits in the Budgets screen.
 - Auto-map Plaid transactions into your custom categories using rule-based matching.
@@ -100,13 +102,15 @@ npm run dev
 
 ## Manual Imports
 
-CSV imports are available at `/import`. Create a manual account, upload a CSV, then review staged transactions at `/review` before they become accepted ledger transactions.
+CSV and text-based PDF imports are available at `/import`. Create a manual account, upload a statement, then review staged transactions at `/review` before they become accepted ledger transactions.
 
 Supported CSV columns:
 
 - `Date`, `Posted Date`, `Post Date`, or `Transaction Date`
 - `Description`, `Merchant`, `Name`, `Payee`, or `Memo`
 - signed `Amount`, or split `Debit`/`Credit`
+
+PDF imports are best-effort text extraction. Scanned image PDFs need OCR before import.
 
 ## Grok Classification
 
@@ -122,7 +126,12 @@ Without `XAI_API_KEY`, the app returns deterministic fallback suggestions so imp
 - `/debt` stores credit cards, loans, APRs, minimum payments, due dates, credit limits, and usage type.
 - `/recurring` scans accepted debit transactions for subscriptions and recurring charges.
 - `/today` shows in-app action items for missing debt details, upcoming card payments, high utilization, interest pressure, suspected subscriptions, price increases, and unclear personal/business usage.
-- This slice does not send push, SMS, or email reminders yet. It creates persistent in-app action items.
+- The alert cron sends or queues daily reminder events for open high/urgent action items when alert delivery is configured.
+
+## Reports And Coach
+
+- `/reports` shows household net, debt balance, estimated monthly interest, recurring monthly spend, personal/business rows, debt warnings, and a subscription cut list.
+- `/coach` generates a daily money brief and answers direct money questions. With `XAI_API_KEY`, it uses Grok. Without it, it returns deterministic rule-based fallback output.
 
 ## Cron Jobs (Vercel)
 
