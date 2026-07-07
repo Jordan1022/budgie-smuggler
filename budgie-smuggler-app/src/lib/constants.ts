@@ -6,6 +6,7 @@ export const NAV_ITEMS = [
   { href: "/debt", label: "Debt" },
   { href: "/recurring", label: "Recurring" },
   { href: "/reports", label: "Reports" },
+  { href: "/coach", label: "Coach" },
   { href: "/import", label: "Import" },
   { href: "/review", label: "Review" },
   { href: "/transactions", label: "Transactions" },
