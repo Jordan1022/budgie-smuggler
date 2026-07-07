@@ -1,8 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { formatISO, startOfMonth } from "date-fns";
 import { computeBudgetProgress, summarizeDashboard } from "@/lib/budget";
+import { listDebtAccounts, summarizeDebt } from "@/lib/debt/service";
 import { MOCK_BUDGET_PROGRESS, MOCK_INSIGHTS, MOCK_TRANSACTIONS } from "@/lib/mock-data";
 import { prisma } from "@/lib/prisma";
+import { listRecurringItems } from "@/lib/recurring/service";
 import type { BudgetProgress } from "@/types/domain";
 
 function toNumber(value: Prisma.Decimal | number | null | undefined) {
@@ -255,6 +257,25 @@ export async function getInsights(userId: string) {
       details: JSON.stringify(row.details),
     })),
     source: "database" as const,
+  };
+}
+
+export async function getDebtPageData(userId: string) {
+  const [accounts, summary] = await Promise.all([listDebtAccounts(userId), summarizeDebt(userId)]);
+
+  return {
+    accounts,
+    summary,
+    source: prisma ? ("database" as const) : ("mock" as const),
+  };
+}
+
+export async function getRecurringPageData(userId: string) {
+  const items = await listRecurringItems(userId);
+
+  return {
+    items,
+    source: prisma ? ("database" as const) : ("mock" as const),
   };
 }
 

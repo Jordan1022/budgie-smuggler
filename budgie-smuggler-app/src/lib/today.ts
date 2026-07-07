@@ -1,6 +1,8 @@
 import { startOfMonth } from "date-fns";
 import { getOpenActionItems } from "@/lib/action-items";
+import { refreshDebtActionItems, summarizeDebt } from "@/lib/debt/service";
 import { prisma } from "@/lib/prisma";
+import { refreshRecurringActionItems } from "@/lib/recurring/service";
 
 function toNumber(value: { toNumber(): number } | number | null | undefined) {
   if (value === null || value === undefined) {
@@ -11,9 +13,9 @@ function toNumber(value: { toNumber(): number } | number | null | undefined) {
 }
 
 export async function getTodayData(userId: string) {
-  const actionItems = await getOpenActionItems(userId, 10);
-
   if (!prisma) {
+    const actionItems = await getOpenActionItems(userId, 10);
+
     return {
       source: "mock" as const,
       actionItems,
@@ -27,8 +29,12 @@ export async function getTodayData(userId: string) {
     };
   }
 
+  await Promise.all([refreshDebtActionItems(userId), refreshRecurringActionItems(userId)]);
+
+  const actionItems = await getOpenActionItems(userId, 10);
+
   const monthStart = startOfMonth(new Date());
-  const [debits, credits, stagedNeedsReview] = await Promise.all([
+  const [debits, credits, stagedNeedsReview, debtSummary] = await Promise.all([
     prisma.transaction.aggregate({
       where: {
         ownerUserId: userId,
@@ -53,6 +59,7 @@ export async function getTodayData(userId: string) {
         reviewStatus: { in: ["needs_review", "suggested"] },
       },
     }),
+    summarizeDebt(userId),
   ]);
 
   const spending = toNumber(debits._sum.amount);
@@ -66,7 +73,7 @@ export async function getTodayData(userId: string) {
       spending,
       income,
       needsReview: stagedNeedsReview,
-      missingDebtDetails: 0,
+      missingDebtDetails: debtSummary.missingDetailCount,
     },
   };
 }
