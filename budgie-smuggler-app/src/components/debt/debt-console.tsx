@@ -14,9 +14,16 @@ type DebtFormState = {
   balance: string;
   apr: string;
   minimumPayment: string;
+  paymentDueDay: string;
   nextDueDate: string;
+  statementCloseDay: string;
   creditLimit: string;
+  promoApr: string;
+  promoAprExpiresOn: string;
   spendingStatus: string;
+  lastPaymentAmount: string;
+  lastPaymentDate: string;
+  lastStatementBalance: string;
   notes: string;
 };
 
@@ -27,9 +34,16 @@ const emptyForm: DebtFormState = {
   balance: "",
   apr: "",
   minimumPayment: "",
+  paymentDueDay: "",
   nextDueDate: "",
+  statementCloseDay: "",
   creditLimit: "",
+  promoApr: "",
+  promoAprExpiresOn: "",
   spendingStatus: "active",
+  lastPaymentAmount: "",
+  lastPaymentDate: "",
+  lastStatementBalance: "",
   notes: "",
 };
 
@@ -53,11 +67,18 @@ function formFromAccount(account: DebtAccountView): DebtFormState {
     usageType: account.usageType,
     balance: String(account.balance),
     apr: account.apr === null || account.apr === undefined ? "" : String(account.apr),
-    minimumPayment: account.minimumPayment === null || account.minimumPayment === undefined ? "" : String(account.minimumPayment),
-    nextDueDate: typeof account.nextDueDate === "string" ? account.nextDueDate : "",
-    creditLimit: account.creditLimit === null || account.creditLimit === undefined ? "" : String(account.creditLimit),
-    spendingStatus: account.spendingStatus ?? "active",
-    notes: account.notes ?? "",
+  minimumPayment: account.minimumPayment === null || account.minimumPayment === undefined ? "" : String(account.minimumPayment),
+  paymentDueDay: account.paymentDueDay === null || account.paymentDueDay === undefined ? "" : String(account.paymentDueDay),
+  nextDueDate: typeof account.nextDueDate === "string" ? account.nextDueDate : "",
+  statementCloseDay: account.statementCloseDay === null || account.statementCloseDay === undefined ? "" : String(account.statementCloseDay),
+  creditLimit: account.creditLimit === null || account.creditLimit === undefined ? "" : String(account.creditLimit),
+  promoApr: account.promoApr === null || account.promoApr === undefined ? "" : String(account.promoApr),
+  promoAprExpiresOn: typeof account.promoAprExpiresOn === "string" ? account.promoAprExpiresOn : "",
+  spendingStatus: account.spendingStatus ?? "active",
+  lastPaymentAmount: account.lastPaymentAmount === null || account.lastPaymentAmount === undefined ? "" : String(account.lastPaymentAmount),
+  lastPaymentDate: typeof account.lastPaymentDate === "string" ? account.lastPaymentDate : "",
+  lastStatementBalance: account.lastStatementBalance === null || account.lastStatementBalance === undefined ? "" : String(account.lastStatementBalance),
+  notes: account.notes ?? "",
   };
 }
 
@@ -104,9 +125,16 @@ export function DebtConsole({
       balance: toNumber(form.balance) ?? 0,
       apr: toNumber(form.apr),
       minimumPayment: toNumber(form.minimumPayment),
+      paymentDueDay: toNumber(form.paymentDueDay),
       nextDueDate: form.nextDueDate || null,
+      statementCloseDay: toNumber(form.statementCloseDay),
       creditLimit: toNumber(form.creditLimit),
+      promoApr: toNumber(form.promoApr),
+      promoAprExpiresOn: form.promoAprExpiresOn || null,
       spendingStatus: form.spendingStatus,
+      lastPaymentAmount: toNumber(form.lastPaymentAmount),
+      lastPaymentDate: form.lastPaymentDate || null,
+      lastStatementBalance: toNumber(form.lastStatementBalance),
       notes: form.notes.trim() || null,
     };
   }
@@ -221,6 +249,9 @@ export function DebtConsole({
                         <span className="rounded-full bg-neutral-100 px-2 py-1">
                           Due {account.nextDueDate instanceof Date ? account.nextDueDate.toISOString().slice(0, 10) : account.nextDueDate ?? "missing"}
                         </span>
+                        {account.paymentDueDay ? <span className="rounded-full bg-neutral-100 px-2 py-1">Due day {account.paymentDueDay}</span> : null}
+                        {account.statementCloseDay ? <span className="rounded-full bg-neutral-100 px-2 py-1">Close day {account.statementCloseDay}</span> : null}
+                        {account.promoApr ? <span className="rounded-full bg-neutral-100 px-2 py-1">Promo {formatPercent(account.promoApr)}</span> : null}
                         {account.utilization !== null ? <span className="rounded-full bg-neutral-100 px-2 py-1">Utilization {account.utilization}%</span> : null}
                       </div>
                       {account.pressureReasons.length ? <p className="mt-2 text-sm font-semibold text-red-700">{account.pressureReasons.join(". ")}.</p> : null}
@@ -271,7 +302,16 @@ export function DebtConsole({
               <label className="grid gap-1 text-sm font-medium">Minimum payment<Input inputMode="decimal" value={form.minimumPayment} onChange={(event) => updateField("minimumPayment", event.target.value)} /></label>
               <label className="grid gap-1 text-sm font-medium">Credit limit<Input inputMode="decimal" value={form.creditLimit} onChange={(event) => updateField("creditLimit", event.target.value)} /></label>
             </div>
-            <label className="grid gap-1 text-sm font-medium">Next due date<Input type="date" value={form.nextDueDate} onChange={(event) => updateField("nextDueDate", event.target.value)} /></label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1 text-sm font-medium">Next due date<Input type="date" value={form.nextDueDate} onChange={(event) => updateField("nextDueDate", event.target.value)} /></label>
+              <label className="grid gap-1 text-sm font-medium">Payment due day<Input inputMode="numeric" min={1} max={31} value={form.paymentDueDay} onChange={(event) => updateField("paymentDueDay", event.target.value)} /></label>
+              <label className="grid gap-1 text-sm font-medium">Statement close day<Input inputMode="numeric" min={1} max={31} value={form.statementCloseDay} onChange={(event) => updateField("statementCloseDay", event.target.value)} /></label>
+              <label className="grid gap-1 text-sm font-medium">Promo APR<Input inputMode="decimal" value={form.promoApr} onChange={(event) => updateField("promoApr", event.target.value)} /></label>
+              <label className="grid gap-1 text-sm font-medium">Promo expires<Input type="date" value={form.promoAprExpiresOn} onChange={(event) => updateField("promoAprExpiresOn", event.target.value)} /></label>
+              <label className="grid gap-1 text-sm font-medium">Last payment<Input inputMode="decimal" value={form.lastPaymentAmount} onChange={(event) => updateField("lastPaymentAmount", event.target.value)} /></label>
+              <label className="grid gap-1 text-sm font-medium">Last payment date<Input type="date" value={form.lastPaymentDate} onChange={(event) => updateField("lastPaymentDate", event.target.value)} /></label>
+              <label className="grid gap-1 text-sm font-medium">Last statement balance<Input inputMode="decimal" value={form.lastStatementBalance} onChange={(event) => updateField("lastStatementBalance", event.target.value)} /></label>
+            </div>
             <label className="grid gap-1 text-sm font-medium">
               Spending status
               <select className="h-11 rounded-xl border border-[var(--line)] bg-white px-3 text-sm" value={form.spendingStatus} onChange={(event) => updateField("spendingStatus", event.target.value)}>
