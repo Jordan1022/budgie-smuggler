@@ -80,7 +80,7 @@ export function ImportUploadForm({
     }
   }
 
-  async function uploadCsv() {
+  async function uploadStatement() {
     if (!selectedAccountId || !file) {
       setMessage("Choose an account and CSV file.");
       return;
@@ -118,7 +118,7 @@ export function ImportUploadForm({
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
       <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
         <div>
-          <h2 className="text-lg font-semibold">Upload statement CSV</h2>
+          <h2 className="text-lg font-semibold">Upload statement</h2>
           <p className="text-sm text-neutral-600">Source: {source}</p>
         </div>
 
@@ -145,12 +145,12 @@ export function ImportUploadForm({
           ) : null}
 
           <label className="grid gap-1 text-sm font-medium">
-            CSV file
-            <Input accept=".csv,text/csv" type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+            CSV or text PDF
+            <Input accept=".csv,text/csv,.pdf,application/pdf" type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
           </label>
 
-          <Button disabled={busy || !selectedAccountId || !file} type="button" onClick={uploadCsv}>
-            Upload CSV
+          <Button disabled={busy || !selectedAccountId || !file} type="button" onClick={uploadStatement}>
+            Upload statement
           </Button>
         </div>
 
