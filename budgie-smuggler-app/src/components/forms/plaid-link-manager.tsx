@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlaidLink } from "react-plaid-link";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +50,7 @@ export function PlaidLinkManager({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const loadAccounts = useEffectEvent(async () => {
+  const loadAccounts = useCallback(async () => {
     if (!canUseDatabase) {
       setAccounts([]);
       setLoadingAccounts(false);
@@ -71,39 +71,42 @@ export function PlaidLinkManager({
     } finally {
       setLoadingAccounts(false);
     }
-  });
+  }, [canUseDatabase]);
 
   useEffect(() => {
     void loadAccounts();
   }, [canUseDatabase, loadAccounts]);
 
-  const handleSuccess = useEffectEvent(async (publicToken: string) => {
-    setError(null);
-    setMessage(null);
+  const handleSuccess = useCallback(
+    async (publicToken: string) => {
+      setError(null);
+      setMessage(null);
 
-    try {
-      const response = await fetch("/api/plaid/exchange-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ publicToken }),
-      });
+      try {
+        const response = await fetch("/api/plaid/exchange-token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ publicToken }),
+        });
 
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, "Failed to connect bank account."));
+        if (!response.ok) {
+          throw new Error(await readErrorMessage(response, "Failed to connect bank account."));
+        }
+
+        setMessage("Bank account connected. Transaction sync has started.");
+        await loadAccounts();
+        router.refresh();
+      } catch (exchangeError) {
+        setError(exchangeError instanceof Error ? exchangeError.message : "Failed to connect bank account.");
+      } finally {
+        setLinkToken(null);
+        setShouldOpenLink(false);
       }
-
-      setMessage("Bank account connected. Transaction sync has started.");
-      await loadAccounts();
-      router.refresh();
-    } catch (exchangeError) {
-      setError(exchangeError instanceof Error ? exchangeError.message : "Failed to connect bank account.");
-    } finally {
-      setLinkToken(null);
-      setShouldOpenLink(false);
-    }
-  });
+    },
+    [loadAccounts, router],
+  );
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
