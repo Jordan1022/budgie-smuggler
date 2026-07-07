@@ -3,6 +3,8 @@ export const APP_SHORT_NAME = "Smuggler";
 
 export const NAV_ITEMS = [
   { href: "/today", label: "Today" },
+  { href: "/debt", label: "Debt" },
+  { href: "/recurring", label: "Recurring" },
   { href: "/import", label: "Import" },
   { href: "/review", label: "Review" },
   { href: "/transactions", label: "Transactions" },
