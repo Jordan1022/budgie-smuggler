@@ -23,6 +23,10 @@ export function buildRecurringActionItems(_userId: string, items: RecurringActio
   const actions: ActionItemInput[] = [];
 
   for (const item of items) {
+    if (item.status === "ignored" || item.status === "cancelled") {
+      continue;
+    }
+
     if (item.status === "suspected") {
       actions.push({
         ...baseAction(item),

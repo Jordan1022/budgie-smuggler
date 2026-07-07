@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { logAiRun } from "@/lib/ai/audit";
 import { answerMoneyQuestion } from "@/lib/ai/grok";
 import { buildMoneyContext } from "@/lib/ai/money-context";
-import { env } from "@/lib/env";
-import { prisma } from "@/lib/prisma";
 import { getRouteUser, unauthorized } from "@/lib/route-auth";
 
 const chatSchema = z.object({
@@ -24,20 +23,13 @@ export async function POST(request: Request) {
   const context = await buildMoneyContext(user.id);
   const result = await answerMoneyQuestion(context, parsed.data.question);
 
-  if (prisma) {
-    await prisma.aiRun.create({
-      data: {
-        ownerUserId: user.id,
-        provider: result.source === "xai" ? "xai" : "fallback",
-        model: result.source === "xai" ? env().XAI_MODEL : "local-rules",
-        purpose: "chat",
-        redactionLevel: "standard",
-        promptVersion: "money-chat-v1",
-        inputSummary: result.redactionSummary,
-        outputStatus: "completed",
-      },
-    });
-  }
+  logAiRun({
+    ownerUserId: user.id,
+    source: result.source,
+    purpose: "chat",
+    promptVersion: "money-chat-v1",
+    redactionSummary: result.redactionSummary,
+  });
 
   return NextResponse.json(result);
 }

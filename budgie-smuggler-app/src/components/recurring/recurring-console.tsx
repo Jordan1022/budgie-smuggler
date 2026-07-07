@@ -76,7 +76,8 @@ export function RecurringConsole({
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error ? JSON.stringify(payload.error) : "Could not update recurring item.");
+        const errorMessage = typeof payload?.error === "string" ? payload.error : payload?.error ? JSON.stringify(payload.error) : "Could not update recurring item.";
+        throw new Error(errorMessage);
       }
 
       setItems((current) => current.map((item) => (item.id === id ? payload.item : item)));

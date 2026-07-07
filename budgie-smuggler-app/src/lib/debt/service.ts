@@ -226,9 +226,20 @@ export async function deleteDebtAccount(userId: string, id: string): Promise<boo
     return true;
   }
 
-  const result = await prisma.debtAccount.deleteMany({
-    where: { id, ownerUserId: userId },
-  });
+  const [, result] = await prisma.$transaction([
+    prisma.actionItem.updateMany({
+      where: {
+        ownerUserId: userId,
+        status: "open",
+        relatedEntityType: "debt_account",
+        relatedEntityId: id,
+      },
+      data: { status: "dismissed" },
+    }),
+    prisma.debtAccount.deleteMany({
+      where: { id, ownerUserId: userId },
+    }),
+  ]);
 
   return result.count > 0;
 }

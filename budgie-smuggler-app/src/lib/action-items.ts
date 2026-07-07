@@ -130,7 +130,7 @@ export async function updateActionItemStatus(
     where: { id, ownerUserId: userId },
     data: {
       status,
-      dueDate: dueDate ?? undefined,
+      dueDate: dueDate === undefined ? undefined : dueDate,
     },
   });
 

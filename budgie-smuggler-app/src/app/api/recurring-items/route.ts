@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listRecurringItems } from "@/lib/recurring/service";
+import { listRecurringItemsWithSource } from "@/lib/recurring/service";
 import { getRouteUser, unauthorized } from "@/lib/route-auth";
 
 export async function GET() {
@@ -8,10 +8,7 @@ export async function GET() {
     return unauthorized();
   }
 
-  const items = await listRecurringItems(user.id);
+  const result = await listRecurringItemsWithSource(user.id);
 
-  return NextResponse.json({
-    items,
-    source: items.length && items[0].id === "mock-recurring" ? "mock" : "database",
-  });
+  return NextResponse.json(result);
 }

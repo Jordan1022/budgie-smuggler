@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, startOfDay } from "date-fns";
 import type { ActionItemInput } from "@/lib/action-items";
-import { calculateUtilization, estimateMonthlyInterest } from "./calculations";
+import { calculateUtilization, estimateMonthlyInterest, parseDebtDate } from "./calculations";
 
 export type DebtActionInput = {
   id: string;
@@ -11,15 +11,6 @@ export type DebtActionInput = {
   nextDueDate?: Date | string | null;
   creditLimit?: number | null;
 };
-
-function parseDate(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const date = value instanceof Date ? value : new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : startOfDay(date);
-}
 
 function baseAction(debt: DebtActionInput): Pick<ActionItemInput, "relatedEntityType" | "relatedEntityId" | "source"> {
   return {
@@ -44,7 +35,7 @@ export function buildDebtActionItems(_userId: string, debts: DebtActionInput[]):
     if (debt.minimumPayment === null || debt.minimumPayment === undefined) {
       missing.push("minimum payment");
     }
-    if (!parseDate(debt.nextDueDate)) {
+    if (!parseDebtDate(debt.nextDueDate)) {
       missing.push("due date");
     }
 
@@ -58,10 +49,19 @@ export function buildDebtActionItems(_userId: string, debts: DebtActionInput[]):
       });
     }
 
-    const dueDate = parseDate(debt.nextDueDate);
+    const dueDate = parseDebtDate(debt.nextDueDate);
     if (dueDate) {
       const daysUntilDue = differenceInCalendarDays(dueDate, startOfDay(new Date()));
-      if (daysUntilDue >= 0 && daysUntilDue <= 7) {
+      if (daysUntilDue < 0) {
+        items.push({
+          ...baseAction(debt),
+          type: "upcoming_debt_due",
+          title: `${debt.name}: payment is overdue`,
+          body: "This debt is past due. Catch it up before late fees and interest stack further.",
+          priority: "urgent",
+          dueDate,
+        });
+      } else if (daysUntilDue <= 7) {
         items.push({
           ...baseAction(debt),
           type: "upcoming_debt_due",

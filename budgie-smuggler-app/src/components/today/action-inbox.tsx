@@ -23,10 +23,12 @@ const priorityStyles: Record<string, string> = {
 export function ActionInbox({ items }: { items: ActionItem[] }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const visibleItems = items.slice(0, 5);
 
   async function updateAction(id: string, status: "done" | "dismissed" | "snoozed") {
     setBusyId(id);
+    setError(null);
 
     try {
       const body =
@@ -37,13 +39,21 @@ export function ActionInbox({ items }: { items: ActionItem[] }) {
             }
           : { status };
 
-      await fetch(`/api/action-items/${id}`, {
+      const response = await fetch(`/api/action-items/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === "string" ? payload.error : payload?.error ? JSON.stringify(payload.error) : "Could not update action item.",
+        );
+      }
 
       router.refresh();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Could not update action item.");
     } finally {
       setBusyId(null);
     }
@@ -57,6 +67,8 @@ export function ActionInbox({ items }: { items: ActionItem[] }) {
           <p className="text-sm text-neutral-600">{items.length} open item{items.length === 1 ? "" : "s"}</p>
         </div>
       </div>
+
+      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
 
       {visibleItems.length === 0 ? (
         <p className="mt-4 rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-700">No open money tasks. Import fresh data if this feels wrong.</p>

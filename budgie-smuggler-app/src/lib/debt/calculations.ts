@@ -19,7 +19,7 @@ function roundCents(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function parseDate(value: Date | string | null | undefined) {
+export function parseDebtDate(value: Date | string | null | undefined) {
   if (!value) {
     return null;
   }
@@ -55,7 +55,7 @@ export function getDebtPressure(input: DebtMathInput): DebtPressure {
     reasons.push("Minimum payment missing");
   }
 
-  if (input.balance > 0 && !parseDate(input.nextDueDate)) {
+  if (input.balance > 0 && !parseDebtDate(input.nextDueDate)) {
     reasons.push("Due date missing");
   }
 
@@ -63,10 +63,13 @@ export function getDebtPressure(input: DebtMathInput): DebtPressure {
     return { label: "missing_info", reasons };
   }
 
-  const dueDate = parseDate(input.nextDueDate);
+  const dueDate = parseDebtDate(input.nextDueDate);
   if (input.balance > 0 && dueDate) {
     const daysUntilDue = differenceInCalendarDays(dueDate, startOfDay(new Date()));
-    if (daysUntilDue >= 0 && daysUntilDue <= 7) {
+    if (daysUntilDue < 0) {
+      return { label: "urgent", reasons: ["Payment is overdue"] };
+    }
+    if (daysUntilDue <= 7) {
       return { label: "urgent", reasons: ["Payment due within 7 days"] };
     }
   }

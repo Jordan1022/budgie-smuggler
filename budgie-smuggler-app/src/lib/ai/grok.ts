@@ -3,6 +3,8 @@ import { redactForAi, type RedactionSummary } from "@/lib/ai/redaction";
 import { importClassificationSchema, moneyBriefSchema, moneyChatSchema, type ImportClassification, type MoneyBrief, type MoneyChatAnswer } from "@/lib/ai/schemas";
 import type { MoneyContext } from "@/lib/ai/money-context";
 
+const XAI_REQUEST_TIMEOUT_MS = 20_000;
+
 export type ClassifyImportInput = {
   importedTransactionId: string;
   date: string;
@@ -46,27 +48,20 @@ export async function classifyImportedTransactions(rows: ClassifyImportInput[]):
   }
 
   const config = env();
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.XAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.XAI_MODEL,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            'Classify imported financial transactions. Return only JSON matching this shape: {"transactions":[{"importedTransactionId":"string","suggestedCategory":string|null,"usageType":"personal|business|mixed|unknown","cashFlowRole":"spending|income|transfer|debt_payment|interest|fee|refund|other","subscriptionLikelihood":number,"duplicateSuspicion":number,"confidence":number,"reason":"string","question":string|null}]}',
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ transactions: redacted }),
-        },
-      ],
-    }),
+  const response = await fetchGrokChatCompletion({
+    model: config.XAI_MODEL,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          'Classify imported financial transactions. Return only JSON matching this shape: {"transactions":[{"importedTransactionId":"string","suggestedCategory":string|null,"usageType":"personal|business|mixed|unknown","cashFlowRole":"spending|income|transfer|debt_payment|interest|fee|refund|other","subscriptionLikelihood":number,"duplicateSuspicion":number,"confidence":number,"reason":"string","question":string|null}]}',
+      },
+      {
+        role: "user",
+        content: JSON.stringify({ transactions: redacted }),
+      },
+    ],
   });
 
   if (!response.ok) {
@@ -112,7 +107,7 @@ function fallbackBrief(context: MoneyContext): MoneyBrief {
 function fallbackChat(context: MoneyContext, question: string): MoneyChatAnswer {
   const brief = fallbackBrief(context);
   return {
-    answer: `Grok is not configured, so this is rule-based. Question: "${question}". ${brief.bluntSummary}`,
+    answer: `Grok is unavailable, so this is rule-based. Question: "${question}". ${brief.bluntSummary}`,
     evidence: [
       `Household net: $${context.reports.household.net.toFixed(2)}`,
       `Debt balance: $${context.reports.household.debtBalance.toFixed(2)}`,
@@ -122,6 +117,26 @@ function fallbackChat(context: MoneyContext, question: string): MoneyChatAnswer 
     nextActions: brief.nextActions,
     confidence: 0.45,
   };
+}
+
+async function fetchGrokChatCompletion(body: unknown) {
+  const config = env();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), XAI_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.XAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function callGrokJson<T>({
@@ -137,20 +152,13 @@ async function callGrokJson<T>({
 }) {
   const { redacted } = redactForAi(context);
   const config = env();
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.XAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.XAI_MODEL,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify({ request: user, context: redacted }) },
-      ],
-    }),
+  const response = await fetchGrokChatCompletion({
+    model: config.XAI_MODEL,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify({ request: user, context: redacted }) },
+    ],
   });
 
   if (!response.ok) {
@@ -170,15 +178,20 @@ export async function generateMoneyBrief(context: MoneyContext): Promise<{ sourc
     return { source: "fallback", brief: fallbackBrief(context), redactionSummary: summary };
   }
 
-  const brief = await callGrokJson({
-    context,
-    user: "Generate today's blunt financial brief.",
-    schema: moneyBriefSchema,
-    system:
-      'You are a blunt household finance operator. Return only JSON: {"headline":"string","bluntSummary":"string","topRisks":["string"],"nextActions":["string"],"subscriptionsToReview":["string"],"confidence":number}. Be direct, practical, and do not shame.',
-  });
+  try {
+    const brief = await callGrokJson({
+      context,
+      user: "Generate today's blunt financial brief.",
+      schema: moneyBriefSchema,
+      system:
+        'You are a blunt household finance operator. Return only JSON: {"headline":"string","bluntSummary":"string","topRisks":["string"],"nextActions":["string"],"subscriptionsToReview":["string"],"confidence":number}. Be direct, practical, and do not shame.',
+    });
 
-  return { source: "xai", brief, redactionSummary: summary };
+    return { source: "xai", brief, redactionSummary: summary };
+  } catch (error) {
+    console.error("Falling back to local money brief after xAI failure.", error);
+    return { source: "fallback", brief: fallbackBrief(context), redactionSummary: summary };
+  }
 }
 
 export async function answerMoneyQuestion(context: MoneyContext, question: string): Promise<{ source: "xai" | "fallback"; answer: MoneyChatAnswer; redactionSummary: RedactionSummary }> {
@@ -188,13 +201,18 @@ export async function answerMoneyQuestion(context: MoneyContext, question: strin
     return { source: "fallback", answer: fallbackChat(context, question), redactionSummary: summary };
   }
 
-  const answer = await callGrokJson({
-    context,
-    user: question,
-    schema: moneyChatSchema,
-    system:
-      'You are a blunt household finance operator answering questions from current app data. Return only JSON: {"answer":"string","evidence":["string"],"nextActions":["string"],"confidence":number}. Be direct, practical, and do not invent data.',
-  });
+  try {
+    const answer = await callGrokJson({
+      context,
+      user: question,
+      schema: moneyChatSchema,
+      system:
+        'You are a blunt household finance operator answering questions from current app data. Return only JSON: {"answer":"string","evidence":["string"],"nextActions":["string"],"confidence":number}. Be direct, practical, and do not invent data.',
+    });
 
-  return { source: "xai", answer, redactionSummary: summary };
+    return { source: "xai", answer, redactionSummary: summary };
+  } catch (error) {
+    console.error("Falling back to local money chat after xAI failure.", error);
+    return { source: "fallback", answer: fallbackChat(context, question), redactionSummary: summary };
+  }
 }

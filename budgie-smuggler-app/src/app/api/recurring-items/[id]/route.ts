@@ -22,15 +22,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const { id } = await context.params;
-  const item = await updateRecurringItem(user.id, id, parsed.data);
-  if (!item) {
+  const result = await updateRecurringItem(user.id, id, parsed.data);
+  if (!result) {
     return NextResponse.json({ error: "Recurring item not found." }, { status: 404 });
   }
 
   await refreshRecurringActionItems(user.id);
 
-  return NextResponse.json({
-    item,
-    source: item.id === "mock-recurring" ? "mock" : "database",
-  });
+  return NextResponse.json(result);
 }

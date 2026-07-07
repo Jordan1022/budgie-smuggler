@@ -32,6 +32,13 @@ describe("debt calculations", () => {
     expect(pressure.reasons).toContain("Payment due within 7 days");
   });
 
+  it("labels overdue debt as urgent", () => {
+    const pressure = getDebtPressure({ balance: 2000, apr: 18, minimumPayment: 40, nextDueDate: subDays(new Date(), 3) });
+
+    expect(pressure.label).toBe("urgent");
+    expect(pressure.reasons).toContain("Payment is overdue");
+  });
+
   it("labels high APR or high utilization as high pressure", () => {
     expect(getDebtPressure({ balance: 2000, apr: 32, minimumPayment: 40, nextDueDate: addDays(new Date(), 20) }).label).toBe("high");
     expect(
