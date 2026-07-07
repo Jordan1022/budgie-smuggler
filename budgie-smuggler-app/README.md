@@ -7,6 +7,8 @@ Private, mobile-first budgeting app for two independent users. Each login has fu
 - Use Today as the default action inbox for concrete money tasks.
 - Create manual personal, business, mixed, or unknown accounts without Plaid.
 - Upload CSV statements, stage imported rows, and review them before ledger acceptance.
+- Track debt accounts with APR, minimum payment, due dates, credit limits, and personal/business usage.
+- Scan accepted transactions for subscriptions and recurring charges.
 - Use Grok-backed classification suggestions for imported transactions when xAI credentials are configured.
 - Create custom budget categories and assign monthly limits in the Budgets screen.
 - Auto-map Plaid transactions into your custom categories using rule-based matching.
@@ -66,6 +68,7 @@ npm run dev
 - File: `supabase/migrations/0001_initial.sql`
 - File: `supabase/migrations/0002_alert_prefs_and_category_lock.sql`
 - File: `supabase/migrations/0004_manual_imports_ai_actions.sql`
+- File: `supabase/migrations/0005_debt_recurring_core.sql`
 
 4. Set values in `.env.local`:
 
@@ -113,6 +116,13 @@ Set these env vars to enable AI suggestions:
 - `XAI_MODEL` defaults to `grok-4.3`
 
 Without `XAI_API_KEY`, the app returns deterministic fallback suggestions so imports remain usable.
+
+## Debt And Recurring Control
+
+- `/debt` stores credit cards, loans, APRs, minimum payments, due dates, credit limits, and usage type.
+- `/recurring` scans accepted debit transactions for subscriptions and recurring charges.
+- `/today` shows in-app action items for missing debt details, upcoming card payments, high utilization, interest pressure, suspected subscriptions, price increases, and unclear personal/business usage.
+- This slice does not send push, SMS, or email reminders yet. It creates persistent in-app action items.
 
 ## Cron Jobs (Vercel)
 
