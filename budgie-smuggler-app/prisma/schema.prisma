@@ -14,19 +14,22 @@ model Profile {
   currency    String   @default("USD") @map("currency_code")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  plaidItems       PlaidItem[]
-  bankAccounts     BankAccount[]
-  categories       Category[]
-  transactions     Transaction[]
-  monthlyBudgets   MonthlyBudget[]
-  alerts           Alert[]
-  alertEvents      AlertEvent[]
-  insightSnapshots InsightSnapshot[]
-  importBatches        ImportBatch[]
-  importedTransactions ImportedTransaction[]
-  actionItems          ActionItem[]
-  aiRuns               AiRun[]
-  aiFindings           AiFinding[]
+  plaidItems                PlaidItem[]
+  bankAccounts              BankAccount[]
+  categories                Category[]
+  transactions              Transaction[]
+  monthlyBudgets            MonthlyBudget[]
+  alerts                    Alert[]
+  alertEvents               AlertEvent[]
+  insightSnapshots          InsightSnapshot[]
+  importBatches             ImportBatch[]
+  importedTransactions      ImportedTransaction[]
+  actionItems               ActionItem[]
+  aiRuns                    AiRun[]
+  aiFindings                AiFinding[]
+  debtAccounts              DebtAccount[]
+  recurringItems            RecurringItem[]
+  recurringTransactionLinks RecurringTransactionLink[]
 
   @@map("profiles")
 }
@@ -66,11 +69,12 @@ model BankAccount {
   lastImportedAt   DateTime? @map("last_imported_at") @db.Timestamptz(6)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  owner        Profile       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  plaidItem    PlaidItem?    @relation(fields: [plaidItemRefId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  importBatches ImportBatch[]
+  owner                Profile               @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  plaidItem            PlaidItem?            @relation(fields: [plaidItemRefId], references: [id], onDelete: Cascade)
+  transactions         Transaction[]
+  importBatches        ImportBatch[]
   importedTransactions ImportedTransaction[]
+  debtAccounts         DebtAccount[]
 
   @@index([ownerUserId])
   @@map("bank_accounts")
@@ -88,6 +92,7 @@ model Category {
   owner          Profile         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   transactions   Transaction[]
   monthlyBudgets MonthlyBudget[]
+  recurringItems RecurringItem[]
 
   @@unique([ownerUserId, name])
   @@index([ownerUserId])
@@ -95,32 +100,33 @@ model Category {
 }
 
 model Transaction {
-  id                 String   @id @default(uuid()) @db.Uuid
-  ownerUserId        String   @map("owner_user_id") @db.Uuid
-  bankAccountId      String   @map("bank_account_id") @db.Uuid
-  plaidTransactionId String?  @unique @map("plaid_transaction_id")
-  postedDate         DateTime @map("posted_date") @db.Date
-  merchantName       String?  @map("merchant_name")
-  description        String?
-  amount             Decimal  @db.Decimal(14, 2)
-  direction          String
-  pending            Boolean  @default(false)
-  categoryId         String?  @map("category_id") @db.Uuid
-  userOverrideCategory Boolean @default(false) @map("user_override_category")
-  rawCategory        String[] @default([]) @map("raw_category")
-  sourceType            String   @default("plaid") @map("source_type")
-  sourceImportBatchId   String?  @map("source_import_batch_id") @db.Uuid
-  usageType             String   @default("unknown") @map("usage_type")
-  cashFlowRole          String   @default("spending") @map("cash_flow_role")
-  reviewStatus          String   @default("accepted") @map("review_status")
-  confidence            Decimal? @db.Decimal(5, 4)
-  notes                 String?
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String   @id @default(uuid()) @db.Uuid
+  ownerUserId          String   @map("owner_user_id") @db.Uuid
+  bankAccountId        String   @map("bank_account_id") @db.Uuid
+  plaidTransactionId   String?  @unique @map("plaid_transaction_id")
+  postedDate           DateTime @map("posted_date") @db.Date
+  merchantName         String?  @map("merchant_name")
+  description          String?
+  amount               Decimal  @db.Decimal(14, 2)
+  direction            String
+  pending              Boolean  @default(false)
+  categoryId           String?  @map("category_id") @db.Uuid
+  userOverrideCategory Boolean  @default(false) @map("user_override_category")
+  rawCategory          String[] @default([]) @map("raw_category")
+  sourceType           String   @default("plaid") @map("source_type")
+  sourceImportBatchId  String?  @map("source_import_batch_id") @db.Uuid
+  usageType            String   @default("unknown") @map("usage_type")
+  cashFlowRole         String   @default("spending") @map("cash_flow_role")
+  reviewStatus         String   @default("accepted") @map("review_status")
+  confidence           Decimal? @db.Decimal(5, 4)
+  notes                String?
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  owner       Profile     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
-  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  owner          Profile                    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  bankAccount    BankAccount                @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  category       Category?                  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  recurringLinks RecurringTransactionLink[]
 
   @@index([ownerUserId, postedDate])
   @@map("transactions")
@@ -217,26 +223,26 @@ model ImportBatch {
 }
 
 model ImportedTransaction {
-  id                    String    @id @default(uuid()) @db.Uuid
-  importBatchId         String    @map("import_batch_id") @db.Uuid
-  ownerUserId           String    @map("owner_user_id") @db.Uuid
-  bankAccountId         String    @map("bank_account_id") @db.Uuid
-  rawDate               String?   @map("raw_date")
-  parsedDate            DateTime  @map("parsed_date") @db.Date
-  rawDescription        String    @map("raw_description")
-  normalizedDescription String    @map("normalized_description")
-  amount                Decimal   @db.Decimal(14, 2)
-  direction             String
-  detectedCategory      String?   @map("detected_category")
-  detectedUsageType     String    @default("unknown") @map("detected_usage_type")
-  detectedCashFlowRole  String    @default("spending") @map("detected_cash_flow_role")
+  id                     String   @id @default(uuid()) @db.Uuid
+  importBatchId          String   @map("import_batch_id") @db.Uuid
+  ownerUserId            String   @map("owner_user_id") @db.Uuid
+  bankAccountId          String   @map("bank_account_id") @db.Uuid
+  rawDate                String?  @map("raw_date")
+  parsedDate             DateTime @map("parsed_date") @db.Date
+  rawDescription         String   @map("raw_description")
+  normalizedDescription  String   @map("normalized_description")
+  amount                 Decimal  @db.Decimal(14, 2)
+  direction              String
+  detectedCategory       String?  @map("detected_category")
+  detectedUsageType      String   @default("unknown") @map("detected_usage_type")
+  detectedCashFlowRole   String   @default("spending") @map("detected_cash_flow_role")
   duplicateTransactionId String?  @map("duplicate_transaction_id") @db.Uuid
-  confidence            Decimal?  @db.Decimal(5, 4)
-  reviewStatus          String    @default("needs_review") @map("review_status")
-  sourceRow             Json      @map("source_row")
-  acceptedTransactionId String?   @map("accepted_transaction_id") @db.Uuid
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  confidence             Decimal? @db.Decimal(5, 4)
+  reviewStatus           String   @default("needs_review") @map("review_status")
+  sourceRow              Json     @map("source_row")
+  acceptedTransactionId  String?  @map("accepted_transaction_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   importBatch ImportBatch @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
   owner       Profile     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
@@ -304,4 +310,84 @@ model AiFinding {
 
   @@index([ownerUserId, reviewStatus])
   @@map("ai_findings")
+}
+
+model DebtAccount {
+  id                   String    @id @default(uuid()) @db.Uuid
+  ownerUserId          String    @map("owner_user_id") @db.Uuid
+  bankAccountId        String?   @map("bank_account_id") @db.Uuid
+  name                 String
+  debtType             String    @default("credit_card") @map("debt_type")
+  usageType            String    @default("unknown") @map("usage_type")
+  balance              Decimal   @db.Decimal(14, 2)
+  apr                  Decimal?  @db.Decimal(7, 4)
+  minimumPayment       Decimal?  @map("minimum_payment") @db.Decimal(14, 2)
+  paymentDueDay        Int?      @map("payment_due_day")
+  nextDueDate          DateTime? @map("next_due_date") @db.Date
+  statementCloseDay    Int?      @map("statement_close_day")
+  creditLimit          Decimal?  @map("credit_limit") @db.Decimal(14, 2)
+  promoApr             Decimal?  @map("promo_apr") @db.Decimal(7, 4)
+  promoAprExpiresOn    DateTime? @map("promo_apr_expires_on") @db.Date
+  spendingStatus       String    @default("active") @map("spending_status")
+  lastPaymentAmount    Decimal?  @map("last_payment_amount") @db.Decimal(14, 2)
+  lastPaymentDate      DateTime? @map("last_payment_date") @db.Date
+  lastStatementBalance Decimal?  @map("last_statement_balance") @db.Decimal(14, 2)
+  notes                String?
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner       Profile      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId])
+  @@index([ownerUserId, nextDueDate])
+  @@map("debt_accounts")
+}
+
+model RecurringItem {
+  id                    String    @id @default(uuid()) @db.Uuid
+  ownerUserId           String    @map("owner_user_id") @db.Uuid
+  merchantName          String    @map("merchant_name")
+  normalizedMerchantKey String    @map("normalized_merchant_key")
+  usageType             String    @default("unknown") @map("usage_type")
+  categoryId            String?   @map("category_id") @db.Uuid
+  amountMin             Decimal   @map("amount_min") @db.Decimal(14, 2)
+  amountMax             Decimal   @map("amount_max") @db.Decimal(14, 2)
+  typicalAmount         Decimal   @map("typical_amount") @db.Decimal(14, 2)
+  cadence               String    @default("unknown")
+  nextExpectedDate      DateTime? @map("next_expected_date") @db.Date
+  lastSeenDate          DateTime  @map("last_seen_date") @db.Date
+  transactionCount      Int       @default(0) @map("transaction_count")
+  status                String    @default("suspected")
+  priceIncreaseDetected Boolean   @default(false) @map("price_increase_detected")
+  increaseAmount        Decimal?  @map("increase_amount") @db.Decimal(14, 2)
+  source                String    @default("rule")
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner    Profile                    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  category Category?                  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  links    RecurringTransactionLink[]
+
+  @@unique([ownerUserId, normalizedMerchantKey, cadence])
+  @@index([ownerUserId, status])
+  @@index([ownerUserId, nextExpectedDate])
+  @@map("recurring_items")
+}
+
+model RecurringTransactionLink {
+  id              String   @id @default(uuid()) @db.Uuid
+  ownerUserId     String   @map("owner_user_id") @db.Uuid
+  recurringItemId String   @map("recurring_item_id") @db.Uuid
+  transactionId   String   @map("transaction_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  owner         Profile       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  recurringItem RecurringItem @relation(fields: [recurringItemId], references: [id], onDelete: Cascade)
+  transaction   Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerUserId, recurringItemId, transactionId])
+  @@index([ownerUserId, transactionId])
+  @@map("recurring_transaction_links")
 }

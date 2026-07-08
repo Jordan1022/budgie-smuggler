@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { createActionItems, type ActionItemInput } from "@/lib/action-items";
 import { parseCsvTransactions, type ParsedCsvTransaction } from "@/lib/imports/csv";
 import { buildDuplicateFingerprint } from "@/lib/imports/normalize";
+import { extractPdfText, parsePdfStatementText } from "@/lib/imports/pdf";
 import { prisma } from "@/lib/prisma";
 
 type ImportRowSummaryInput = {
@@ -77,19 +78,36 @@ export async function importCsvForAccount(input: {
   csvText: string;
 }) {
   const parsed = parseCsvTransactions(input.csvText);
+  return importParsedRowsForAccount({
+    userId: input.userId,
+    bankAccountId: input.bankAccountId,
+    fileName: input.fileName,
+    fileType: "csv",
+    fileHashSource: input.csvText,
+    parsed,
+  });
+}
 
+async function importParsedRowsForAccount(input: {
+  userId: string;
+  bankAccountId: string;
+  fileName: string;
+  fileType: string;
+  fileHashSource: string | Buffer;
+  parsed: ReturnType<typeof parseCsvTransactions>;
+}) {
   if (!prisma) {
-    const summary = summarizeImportRows(parsed.rows.map(() => ({ reviewStatus: "needs_review" })));
+    const summary = summarizeImportRows(input.parsed.rows.map(() => ({ reviewStatus: "needs_review" })));
     return {
       source: "mock" as const,
       importBatchId: "mock-import",
-      parsed,
+      parsed: input.parsed,
       summary,
     };
   }
 
-  if (parsed.rows.length === 0) {
-    throw new Error(parsed.errors[0] ?? "No importable rows found.");
+  if (input.parsed.rows.length === 0) {
+    throw new Error(input.parsed.errors[0] ?? "No importable rows found.");
   }
 
   const db = prisma;
@@ -104,8 +122,8 @@ export async function importCsvForAccount(input: {
     throw new Error("Account not found.");
   }
 
-  const fileHash = createHash("sha256").update(input.csvText).digest("hex");
-  const dateRange = getDateRange(parsed.rows);
+  const fileHash = createHash("sha256").update(input.fileHashSource).digest("hex");
+  const dateRange = getDateRange(input.parsed.rows);
 
   const result = await db.$transaction(async (tx) => {
     const batch = await tx.importBatch.create({
@@ -113,9 +131,9 @@ export async function importCsvForAccount(input: {
         ownerUserId: input.userId,
         bankAccountId: input.bankAccountId,
         fileName: input.fileName,
-        fileType: "csv",
+        fileType: input.fileType,
         fileHash,
-        parserStatus: parsed.errors.length > 0 ? "needs_review" : "parsed",
+        parserStatus: input.parsed.errors.length > 0 ? "needs_review" : "parsed",
         detectedStartDate: dateRange.start,
         detectedEndDate: dateRange.end,
       },
@@ -123,11 +141,11 @@ export async function importCsvForAccount(input: {
 
     const existing = await tx.transaction.findMany({
       where: {
-        ownerUserId: input.userId,
-        bankAccountId: input.bankAccountId,
-        postedDate: {
-          in: parsed.rows.map((row) => new Date(row.parsedDate)),
-        },
+          ownerUserId: input.userId,
+          bankAccountId: input.bankAccountId,
+          postedDate: {
+            in: input.parsed.rows.map((row) => new Date(row.parsedDate)),
+          },
       },
       select: {
         id: true,
@@ -153,7 +171,7 @@ export async function importCsvForAccount(input: {
     );
 
     const staged = await Promise.all(
-      parsed.rows.map((row) => {
+      input.parsed.rows.map((row) => {
         const duplicateTransactionId =
           existingByFingerprint.get(
             buildDuplicateFingerprint({
@@ -211,7 +229,26 @@ export async function importCsvForAccount(input: {
   return {
     source: "database" as const,
     importBatchId: result.batch.id,
-    parsed,
+    parsed: input.parsed,
     summary,
   };
+}
+
+export async function importPdfForAccount(input: {
+  userId: string;
+  bankAccountId: string;
+  fileName: string;
+  pdfBuffer: Buffer;
+}) {
+  const text = await extractPdfText(input.pdfBuffer);
+  const parsed = parsePdfStatementText(text);
+
+  return importParsedRowsForAccount({
+    userId: input.userId,
+    bankAccountId: input.bankAccountId,
+    fileName: input.fileName,
+    fileType: "pdf",
+    fileHashSource: input.pdfBuffer,
+    parsed,
+  });
 }

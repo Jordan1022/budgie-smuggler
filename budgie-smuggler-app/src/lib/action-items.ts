@@ -16,8 +16,43 @@ export async function createActionItems(userId: string, items: ActionItemInput[]
     return { created: 0, source: prisma ? ("database" as const) : ("mock" as const) };
   }
 
+  const dedupeRows = await prisma.actionItem.findMany({
+    where: {
+      ownerUserId: userId,
+      status: "open",
+      OR: items.map((item) => ({
+        type: item.type,
+        relatedEntityType: item.relatedEntityType ?? null,
+        relatedEntityId: item.relatedEntityId ?? null,
+      })),
+    },
+    select: {
+      type: true,
+      relatedEntityType: true,
+      relatedEntityId: true,
+    },
+  });
+
+  const existingKeys = new Set(
+    dedupeRows.map((row) => `${row.type}:${row.relatedEntityType ?? ""}:${row.relatedEntityId ?? ""}`),
+  );
+
+  const newItems = items.filter((item) => {
+    const key = `${item.type}:${item.relatedEntityType ?? ""}:${item.relatedEntityId ?? ""}`;
+    if (existingKeys.has(key)) {
+      return false;
+    }
+
+    existingKeys.add(key);
+    return true;
+  });
+
+  if (newItems.length === 0) {
+    return { created: 0, source: "database" as const };
+  }
+
   await prisma.actionItem.createMany({
-    data: items.map((item) => ({
+    data: newItems.map((item) => ({
       ownerUserId: userId,
       type: item.type,
       title: item.title,
@@ -30,7 +65,7 @@ export async function createActionItems(userId: string, items: ActionItemInput[]
     })),
   });
 
-  return { created: items.length, source: "database" as const };
+  return { created: newItems.length, source: "database" as const };
 }
 
 export async function getOpenActionItems(userId: string, limit = 20) {
@@ -79,4 +114,25 @@ export async function getOpenActionItems(userId: string, limit = 20) {
       source: row.source,
       createdAt: row.createdAt.toISOString(),
     }));
+}
+
+export async function updateActionItemStatus(
+  userId: string,
+  id: string,
+  status: "open" | "snoozed" | "done" | "dismissed",
+  dueDate?: Date | null,
+) {
+  if (!prisma) {
+    return { ok: true, source: "mock" as const };
+  }
+
+  const result = await prisma.actionItem.updateMany({
+    where: { id, ownerUserId: userId },
+    data: {
+      status,
+      dueDate: dueDate === undefined ? undefined : dueDate,
+    },
+  });
+
+  return { ok: result.count > 0, source: "database" as const };
 }

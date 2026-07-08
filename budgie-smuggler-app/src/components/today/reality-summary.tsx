@@ -41,7 +41,7 @@ export function RealitySummary({ reality, source }: { reality: Reality; source: 
 
       {reality.missingDebtDetails > 0 ? (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 md:col-span-2 xl:col-span-4">
-          <p className="font-semibold">{reality.missingDebtDetails} cards are missing APR or minimum payment details.</p>
+          <p className="font-semibold">{reality.missingDebtDetails} debt accounts are missing APR, minimum payment, or due date details. Fill them in or the plan is guesswork.</p>
         </div>
       ) : null}
     </section>

@@ -1,3 +1,10 @@
+"use client";
+
+import { addDays } from "date-fns";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
 type ActionItem = {
   id: string;
   title: string;
@@ -14,7 +21,43 @@ const priorityStyles: Record<string, string> = {
 };
 
 export function ActionInbox({ items }: { items: ActionItem[] }) {
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const visibleItems = items.slice(0, 5);
+
+  async function updateAction(id: string, status: "done" | "dismissed" | "snoozed") {
+    setBusyId(id);
+    setError(null);
+
+    try {
+      const body =
+        status === "snoozed"
+          ? {
+              status,
+              dueDate: addDays(new Date(), 7).toISOString().slice(0, 10),
+            }
+          : { status };
+
+      const response = await fetch(`/api/action-items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === "string" ? payload.error : payload?.error ? JSON.stringify(payload.error) : "Could not update action item.",
+        );
+      }
+
+      router.refresh();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Could not update action item.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
@@ -25,6 +68,8 @@ export function ActionInbox({ items }: { items: ActionItem[] }) {
         </div>
       </div>
 
+      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+
       {visibleItems.length === 0 ? (
         <p className="mt-4 rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-700">No open money tasks. Import fresh data if this feels wrong.</p>
       ) : (
@@ -32,10 +77,21 @@ export function ActionInbox({ items }: { items: ActionItem[] }) {
           {visibleItems.map((item) => (
             <li key={item.id} className="py-3 first:pt-0 last:pb-0">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="font-semibold">{item.title}</p>
                   {item.body ? <p className="mt-1 text-sm text-neutral-600">{item.body}</p> : null}
                   {item.dueDate ? <p className="mt-1 text-xs text-neutral-500">Due {item.dueDate}</p> : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button className="h-9 px-3" type="button" variant="secondary" disabled={busyId === item.id} onClick={() => void updateAction(item.id, "done")}>
+                      Done
+                    </Button>
+                    <Button className="h-9 px-3" type="button" variant="secondary" disabled={busyId === item.id} onClick={() => void updateAction(item.id, "snoozed")}>
+                      Snooze
+                    </Button>
+                    <Button className="h-9 px-3" type="button" variant="ghost" disabled={busyId === item.id} onClick={() => void updateAction(item.id, "dismissed")}>
+                      Dismiss
+                    </Button>
+                  </div>
                 </div>
                 <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${priorityStyles[item.priority] ?? priorityStyles.normal}`}>
                   {item.priority}

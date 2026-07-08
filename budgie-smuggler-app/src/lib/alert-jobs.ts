@@ -240,6 +240,40 @@ export async function runAlertsForUser(userId: string) {
     }
   }
 
+  const today = format(new Date(), "yyyy-MM-dd");
+  const urgentActions = await db.actionItem.findMany({
+    where: {
+      ownerUserId: userId,
+      status: "open",
+      priority: {
+        in: ["urgent", "high"],
+      },
+    },
+    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    take: 8,
+  });
+
+  if (urgentActions.length > 0) {
+    const dedupeKey = `action-reminder:${today}:${urgentActions.map((item) => item.id).join(",")}`;
+    const exists = await db.alertEvent.findFirst({
+      where: {
+        ownerUserId: userId,
+        dedupeKey,
+      },
+    });
+
+    if (!exists) {
+      sentEvents.push({
+        subject: `Money actions waiting: ${urgentActions.length}`,
+        text: urgentActions
+          .slice(0, 5)
+          .map((item) => `${item.priority.toUpperCase()}: ${item.title}${item.body ? ` - ${item.body}` : ""}`)
+          .join("\n"),
+        dedupeKey,
+      });
+    }
+  }
+
   if (!sentEvents.length) {
     return { sent: 0, skipped: 0 };
   }

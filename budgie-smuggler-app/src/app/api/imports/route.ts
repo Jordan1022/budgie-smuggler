@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { importCsvForAccount } from "@/lib/imports/service";
+import { importCsvForAccount, importPdfForAccount } from "@/lib/imports/service";
 import { prisma } from "@/lib/prisma";
 import { getRouteUser, unauthorized } from "@/lib/route-auth";
 
@@ -54,17 +54,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "bankAccountId and file are required." }, { status: 400 });
   }
 
-  if (!file.name.toLowerCase().endsWith(".csv")) {
-    return NextResponse.json({ error: "Only CSV imports are supported in this version." }, { status: 400 });
+  const lowerName = file.name.toLowerCase();
+  if (!lowerName.endsWith(".csv") && !lowerName.endsWith(".pdf")) {
+    return NextResponse.json({ error: "Only CSV and text-based PDF imports are supported." }, { status: 400 });
   }
 
   try {
-    const result = await importCsvForAccount({
-      userId: user.id,
-      bankAccountId,
-      fileName: file.name,
-      csvText: await file.text(),
-    });
+    const result = lowerName.endsWith(".pdf")
+      ? await importPdfForAccount({
+          userId: user.id,
+          bankAccountId,
+          fileName: file.name,
+          pdfBuffer: Buffer.from(await file.arrayBuffer()),
+        })
+      : await importCsvForAccount({
+          userId: user.id,
+          bankAccountId,
+          fileName: file.name,
+          csvText: await file.text(),
+        });
 
     return NextResponse.json(result);
   } catch (error) {
