@@ -63,8 +63,8 @@ model BankAccount {
   subtype          String?
   sourceType       String    @default("plaid") @map("source_type")
   usageType        String    @default("unknown") @map("usage_type")
-  currentBalance   Decimal?  @db.Decimal(14, 2)
-  availableBalance Decimal?  @db.Decimal(14, 2)
+  currentBalance   Decimal?  @map("current_balance") @db.Decimal(14, 2)
+  availableBalance Decimal?  @map("available_balance") @db.Decimal(14, 2)
   lastBalanceAt    DateTime? @map("last_balance_at") @db.Timestamptz(6)
   lastImportedAt   DateTime? @map("last_imported_at") @db.Timestamptz(6)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
